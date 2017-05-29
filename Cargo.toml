@@ -1,0 +1,17 @@
+[package]
+name = "phoneme_morpher"
+version = "0.1.0"
+authors = ["Andrew Smith <andrewchristophersmith@gmail.com>"]
+
+[dependencies]
+soundsym = { path = "../soundsym" }
+hound = "1.1"
+getopts = "*"
+interactor = "0.1"
+regex = "0.1"
+statfeed = { path = "../statfeed" }
+vox_box = { path = "../vox_box" }
+num = "*"
+cogset = { path = "../../../rust/cogset" }
+rusty-machine = { path = "../../../rust/rusty-machine/rusty-machine" }
+
