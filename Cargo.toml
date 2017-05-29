@@ -6,12 +6,11 @@ authors = ["Andrew Smith <andrewchristophersmith@gmail.com>"]
 [dependencies]
 soundsym = { path = "../soundsym" }
 hound = "1.1"
-getopts = "*"
+getopts = "0.2"
 interactor = "0.1"
 regex = "0.1"
 statfeed = { path = "../statfeed" }
 vox_box = { path = "../vox_box" }
-num = "*"
-cogset = { path = "../../../rust/cogset" }
-rusty-machine = { path = "../../../rust/rusty-machine/rusty-machine" }
+num = "0.1"
+rusty-machine = "0.2.8"
 

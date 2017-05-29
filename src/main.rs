@@ -5,7 +5,6 @@ extern crate getopts;
 extern crate interactor;
 extern crate statfeed;
 extern crate vox_box;
-extern crate cogset;
 extern crate num;
 extern crate rusty_machine;
 

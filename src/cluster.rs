@@ -5,7 +5,6 @@ use vox_box::polynomial::Polynomial;
 use vox_box::spectrum::{LPC, Resonance, ToResonance};
 use vox_box::waves::{Normalize, Filter, WindowType, Windower, Resample};
 use num::complex::Complex;
-use cogset::{Euclid, Optics, BruteScan, KmeansBuilder};
 use rusty_machine::prelude::*;
 use rusty_machine::linalg::utils;
 use rusty_machine::linalg::matrix::MatrixSliceMut;
