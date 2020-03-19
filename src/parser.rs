@@ -4,24 +4,24 @@ use std::error::Error;
 
 // TODO: macro-ify this
 pub fn parse_input() -> Result<Input, Box<Error>> {
-    let q = Regex::new(r"^[qQ]\s+$");
-    let o = Regex::new(r"^[oO]\s+$");
-    let p = Regex::new(r"^[pP]\s+$");
-    let d = Regex::new(r"^[dD]\s+$");
-    let clear = Regex::new(r"^clear\s+$");
-    let labels = Regex::new(r"^labels\s+$");
-    let cluster = Regex::new(r"^cluster (\d+)\s+$");
-    let predict = Regex::new(r"^predict (\d+)\s+$");
-    let partition = Regex::new(r"^partition (\d+), (\d+)");
-    let split = Regex::new(r"^split (\d+), (\d+)");
-    let morph = Regex::new(r"^morph (\d+(\.\d+)?)");
-    let params = Regex::new(r"^params (\d+(\.\d+)?), (\d+(\.\d+)?), (\d+)\s+$");
-    let feeder = Regex::new(r"^feeder (\d+), (\d+)");
-    let load = Regex::new(r"^load '([\w/]+)'\s+$");
-    let train = Regex::new(r"^train '([\w/]+)'\s+$");
-    let save = Regex::new(r"^save '([\w/]+)'\s+$");
-    let read = Regex::new(r"^read '([\w/\.]+)'\s+$");
-    let help = Regex::new(r"^\?");
+    let q = Regex::new(r"^[qQ]\s+$")?;
+    let o = Regex::new(r"^[oO]\s+$")?;
+    let p = Regex::new(r"^[pP]\s+$")?;
+    let d = Regex::new(r"^[dD]\s+$")?;
+    let clear = Regex::new(r"^clear\s+$")?;
+    let labels = Regex::new(r"^labels\s+$")?;
+    let cluster = Regex::new(r"^cluster (\d+)\s+$")?;
+    let predict = Regex::new(r"^predict (\d+)\s+$")?;
+    let partition = Regex::new(r"^partition (\d+), (\d+)")?;
+    let split = Regex::new(r"^split (\d+), (\d+)")?;
+    let morph = Regex::new(r"^morph (\d+(\.\d+)?)")?;
+    let params = Regex::new(r"^params (\d+(\.\d+)?), (\d+(\.\d+)?), (\d+)\s+$")?;
+    let feeder = Regex::new(r"^feeder (\d+), (\d+)")?;
+    let load = Regex::new(r"^load '([\w/]+)'\s+$")?;
+    let train = Regex::new(r"^train '([\w/]+)'\s+$")?;
+    let save = Regex::new(r"^save '([\w/]+)'\s+$")?;
+    let read = Regex::new(r"^read '([\w/\.]+)'\s+$")?;
+    let help = Regex::new(r"^\?")?;
 
     let mut buf = String::new();
     try!(io::stdin().read_line(&mut buf));
@@ -89,6 +89,7 @@ pub fn parse_input() -> Result<Input, Box<Error>> {
                 try!(cap.at(1).unwrap().parse::<f64>())))
     }
 
+    println!("Could not understand.");
     Ok(Input::None)
 }
 

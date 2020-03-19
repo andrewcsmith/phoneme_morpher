@@ -13,4 +13,5 @@ statfeed = { path = "../statfeed" }
 vox_box = { path = "../vox_box" }
 num = "0.1"
 rusty-machine = "0.2.8"
+rulinalg = "0.3.7"
 

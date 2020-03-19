@@ -1,9 +1,9 @@
 use soundsym::*;
 use vox_box::*;
-use vox_box::periodic::{Autocorrelate, Pitch, HasPitch};
+use vox_box::periodic::{Autocorrelate, Pitch};
 use vox_box::polynomial::Polynomial;
 use vox_box::spectrum::{LPC, Resonance, ToResonance};
-use vox_box::waves::{Normalize, Filter, WindowType, Windower, Resample};
+use vox_box::waves::{Normalize, Filter};
 use num::complex::Complex;
 use rusty_machine::prelude::*;
 use rusty_machine::linalg::utils;
@@ -15,6 +15,7 @@ use rusty_machine::learning::optim::OptimAlgorithm;
 
 use std::i32;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::path::Path;
 use std::fs::File;
 use std::io::Write;
@@ -34,17 +35,18 @@ fn max_f64(v: &[f64]) -> f64 {
 /// Data layout:
 ///
 /// 0..NCOEFFS: the mfcc coefficients
-/// NCOEFFS..(NCOEFFS+NFORMANTS): pitch strength, 3 formant frequencies
+/// NCOEFFS..(NCOEFFS+2): pitch strength, max power
 pub fn sound_feature_vector(sound: &Sound) -> Vec<f64> {
     let mut features = Vec::<f64>::with_capacity(SIZE);
-    features.extend_from_slice(&sound.mean_mfccs().0);
-    let formants = sound.mean_formants(&mut vec![0f64; sound.samples().len()]);
-    features.extend_from_slice(&formants[..]);
+    features.extend_from_slice(&sound.mean_mfccs()[..]);
+    features.push(sound.pitch_confidence());
+    // let formants = sound.mean_formants(&mut vec![0f64; sound.samples().len()]);
+    // features.extend_from_slice(&formants[..]);
     features.push(sound.max_power());
     features
 }
 
-fn get_feature_matrix(sounds: &[Rc<Sound>]) -> Matrix<f64> {
+fn get_feature_matrix(sounds: &[Arc<Sound>]) -> Matrix<f64> {
     let features: Vec<f64> = sounds.iter().fold(
         Vec::with_capacity(sounds.len() * SIZE), 
         |mut acc, sound| {
@@ -94,7 +96,7 @@ fn normalize_feature_matrix(mut feature_matrix: &mut Matrix<f64>) -> Vec<(f64, f
 }
 
 /// Performs K-Means clustering on a slice of Sounds, renaming in-place
-pub fn cluster_sounds(sounds: &mut [Rc<Sound>], nclusters: usize) {
+pub fn cluster_sounds(sounds: &mut [Arc<Sound>], nclusters: usize) {
     let mut feature_matrix = get_feature_matrix(sounds);
     normalize_feature_matrix(&mut feature_matrix);
 
@@ -104,13 +106,13 @@ pub fn cluster_sounds(sounds: &mut [Rc<Sound>], nclusters: usize) {
 
     for (idx, cluster) in res.data().iter().enumerate() {
         let name = format!("{:02}-{:04}", cluster, idx);
-        Rc::get_mut(&mut sounds[idx])
+        Arc::get_mut(&mut sounds[idx])
             .expect("Could not change the name of the sound!")
             .name = Some(name);
     }
 }
 
-pub fn train_nn<'a, T: Criterion, A: OptimAlgorithm<BaseNeuralNet<'a, T>>>(nn: &mut NeuralNet<'a, T, A>, sounds: &[Rc<Sound>], labels: &[String], dict: &[char]) -> Vec<(f64, f64)> {
+pub fn train_nn<'a, T: Criterion, A: OptimAlgorithm<BaseNeuralNet<'a, T>>>(nn: &mut NeuralNet<'a, T, A>, sounds: &[Arc<Sound>], labels: &[String], dict: &[char]) -> Vec<(f64, f64)> {
     // Need to have one row for each Sound
     let rows = sounds.len();
     let cols = dict.len();
@@ -123,18 +125,19 @@ pub fn train_nn<'a, T: Criterion, A: OptimAlgorithm<BaseNeuralNet<'a, T>>>(nn: &
         }
     }
 
-    let mut feature_matrix = get_feature_matrix(&sounds);
+    let mut feature_matrix = get_feature_matrix(sounds);
     let out = normalize_feature_matrix(&mut feature_matrix);
     matrix_to_csv(&feature_matrix, &Path::new("features.csv"));
     nn.train(&feature_matrix, &targets);
-    for idx in 0..(nn.layers()-1) {
-        matrix_to_csv(&nn.get_net_weights(idx), &Path::new(&format!("weights_{}.csv", idx)));
-    }
+    // TODO: Reimplement
+    // for idx in 0..(nn.layers() - 1) {
+    //     matrix_to_csv(&nn.get_net_weights(idx), &Path::new(&format!("weights_{}.csv", idx)));
+    // }
     out
 }
 
 /// Predicts which char is contained by the given Sound
-pub fn predict_nn<'a, T: Criterion, A: OptimAlgorithm<BaseNeuralNet<'a, T>>>(nn: &NeuralNet<'a, T, A>, sound: Rc<Sound>, dict: &[char], scales: Option<Vec<(f64, f64)>>) -> char {
+pub fn predict_nn<'a, T: Criterion, A: OptimAlgorithm<BaseNeuralNet<'a, T>>>(nn: &NeuralNet<'a, T, A>, sound: Arc<Sound>, dict: &[char], scales: Option<Vec<(f64, f64)>>) -> char {
     let mut feature_matrix = get_feature_matrix(&[sound]);
 
     println!("{}", &feature_matrix);

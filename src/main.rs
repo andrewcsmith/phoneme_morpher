@@ -7,6 +7,7 @@ extern crate statfeed;
 extern crate vox_box;
 extern crate num;
 extern crate rusty_machine;
+extern crate rulinalg;
 
 use std::error::Error;
 use std::path::Path;
@@ -18,13 +19,15 @@ use std::io::{Write, BufReader, BufRead, BufWriter};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::collections::HashSet;
 
 use soundsym::*;
 use getopts::{Options, Matches};
 use regex::Regex;
 use interactor::*;
-use rusty_machine::prelude::*;
+use rulinalg::matrix::Matrix;
+// use rusty_machine::prelude::*;
 use rusty_machine::learning::nnet::{NeuralNet, BCECriterion, MSECriterion};
 use rusty_machine::learning::optim::grad_desc::{GradientDesc, StochasticGD};
 use rusty_machine::learning::optim::fmincg::ConjugateGD;
@@ -94,7 +97,7 @@ fn run() -> Result<(), Box<Error>> {
     let mut sequence: Option<SoundSequence> = None;
     let mut labels = Vec::<String>::new();
     let mut possible_characters = Vec::<char>::new();
-    let mut nn: Option<NeuralNet<_, _>> = None;
+    // let mut nn: Option<NeuralNet<_, _>> = None;
     let mut scales: Option<Vec<(f64, f64)>> = None;
     let mut gdparams: (f64, f64, usize) = (0.1, 0.1, 1000);
 
@@ -130,36 +133,40 @@ fn run() -> Result<(), Box<Error>> {
                 gdparams = (alpha, mu, iters);
             }
             Input::Train(path) => {
-                let training_set = SoundDictionary::from_path(&Path::new(&path)).unwrap();
-                let txt = format!("{}.txt", path);
-                let labels = read_labels(&Path::new(&txt)).unwrap();
-
-                for label in labels.iter() {
-                    for c in label.chars() {
-                        if !possible_characters.contains(&c) {
-                            possible_characters.push(c);
-                        }
-                    }
-                }
-
-                let hidden_layer_size = (cluster::SIZE + possible_characters.len()) / 2;
-                let layers = vec![cluster::SIZE, hidden_layer_size, possible_characters.len()];
-                let mut net = NeuralNet::new(Cow::Owned(layers), MSECriterion, StochasticGD::new(gdparams.0, gdparams.1, gdparams.2));
-                println!("Training commencing.");
-                scales = Some(cluster::train_nn(&mut net, &training_set.sounds, &labels, &possible_characters[..]));
-                nn = Some(net);
-                println!("I know Kung Fu.");
+                println!("Not implemented.");
+                // TODO: Implement
+                // let training_set = SoundDictionary::from_path(&Path::new(&path)).unwrap();
+                // let txt = format!("{}.txt", path);
+                // let labels = read_labels(&Path::new(&txt)).unwrap();
+                //
+                // for label in labels.iter() {
+                //     for c in label.chars() {
+                //         if !possible_characters.contains(&c) {
+                //             possible_characters.push(c);
+                //         }
+                //     }
+                // }
+                //
+                // let hidden_layer_size = (cluster::SIZE + possible_characters.len()) / 2;
+                // let layers = vec![cluster::SIZE, hidden_layer_size, possible_characters.len()];
+                // let mut net = NeuralNet::new(Cow::Owned(layers), MSECriterion, StochasticGD::new(gdparams.0, gdparams.1, gdparams.2));
+                // println!("Training commencing.");
+                // scales = Some(cluster::train_nn(&mut net, &training_set.sounds, &labels, &possible_characters[..]));
+                // nn = Some(net);
+                // println!("I know Kung Fu.");
             }
             Input::Predict(idx) => {
-                match nn {
-                    Some(ref net) => {
-                        if let Some(sound) = dictionary.borrow().sounds.get(idx) {
-                            let prediction = cluster::predict_nn(net, sound.clone(), &possible_characters[..], scales.clone());
-                            println!("{}", prediction);
-                        }
-                    }
-                    None => { println!("No net initialized. Call train.") }
-                }
+                println!("Not implemented.");
+                // TODO: Implement
+                // match nn {
+                //     Some(ref net) => {
+                //         if let Some(sound) = dictionary.borrow().sounds.get(idx) {
+                //             let prediction = cluster::predict_nn(net, sound.clone(), &possible_characters[..], scales.clone());
+                //             println!("{}", prediction);
+                //         }
+                //     }
+                //     None => { println!("No net initialized. Call train.") }
+                // }
             }
             Input::Partition(threshold, depth) => {
                 match current_sound {
@@ -175,14 +182,17 @@ fn run() -> Result<(), Box<Error>> {
                 let nsounds = dictionary.borrow().sounds.len();
                 println!("Sounds: {}", nsounds);
                 for sound in dictionary.borrow().sounds.iter() {
-                    println!("{}", sound.name().unwrap_or("".to_string()));
+                    let name = sound.name.as_ref().map(|s| String::as_str(s)).unwrap_or("");
+                    let con = sound.pitch_confidence();
+                    let pow = sound.max_power();
+                    println!("{}\tcon: {:.4}\tpow: {:.4}", name, con, pow);
                 }
             }
             Input::Clear => {
                 dictionary = Rc::new(RefCell::new(SoundDictionary::new()));
             }
             Input::Feeder(length, lines) => {
-                let sounds = dictionary.borrow().sounds.iter().map(|s| s.clone()).collect();
+                let sounds: Vec<Arc<Sound>> = dictionary.borrow().sounds.iter().map(|s| s.clone()).collect();
                 let mut feeder = Feeder::new(sounds, length, lines);
                 let out_file = File::create("phoneme_poem.txt").expect("File not successfully created");
                 let mut writer = BufWriter::new(out_file);
@@ -194,6 +204,7 @@ fn run() -> Result<(), Box<Error>> {
                     // println!("{}", line);
                     line.to_sound().write_file(&Path::new(&format!("fed/line_{:03}.wav", idx)));
                 }
+                println!("Finished feeding.");
             }
             Input::Load(dir) => {
                 println!("loading dictionary from {}", dir);
@@ -210,7 +221,7 @@ fn run() -> Result<(), Box<Error>> {
             Input::Save(dir) => {
                 println!("Saving dictionary to {}", dir);
                 for (idx, sound) in dictionary.borrow().sounds.iter().enumerate() {
-                    match sound.write_file(&Path::new(&format!("{}/{}_{:05}.wav", dir, sound.name().unwrap_or("".to_string()), idx))) {
+                    match sound.write_file(&Path::new(&format!("{}/{}_{:05}.wav", dir, sound.name.as_ref().map(|s| String::as_ref(&s)).unwrap_or(""), idx))) {
                         Err(e) => { println!("Error: {}", e.description()); }
                         _ => { }
                     }
@@ -223,7 +234,7 @@ fn run() -> Result<(), Box<Error>> {
                     match read_labels(&path) {
                         Ok(l) => { 
                             for (idx, s) in dictionary.borrow_mut().sounds.iter_mut().enumerate() {
-                                let mut new_sound = Rc::make_mut(s);
+                                let mut new_sound = Arc::make_mut(s);
                                 new_sound.name = Some(l[idx].clone());
                             }
                             labels.extend_from_slice(&l[..]); 
@@ -275,7 +286,9 @@ fn prompt_filename() -> Result<Sound, Box<Error>> {
     let chosen_file = pick_file(|| default_menu_cmd(), 
                                 std::env::current_dir().unwrap()).unwrap();
     println!("Opening file {}", chosen_file.to_str().unwrap_or(""));
-    Sound::from_path(&chosen_file.as_path())
+    let mut sound = Sound::from_path(&chosen_file.as_path());
+    // sound.as_mut().map(|ref mut s| s.preload_pitch_confidence());
+    sound
 }
 
 fn print_sound_info(sound: &Sound) { 
@@ -286,12 +299,20 @@ fn print_sound_info(sound: &Sound) {
 
 fn partition_sound(sound: &Sound, dictionary: &mut SoundDictionary, threshold: usize, depth: usize) {
     println!("Partitioning {}", sound.name.clone().unwrap_or("no name".to_string()));
-    let partitioner = Partitioner::new(Cow::Borrowed(sound))
-        .threshold(threshold)
-        .depth(depth);
-    let segments = partitioner.partition().unwrap();
-    println!("Found {} segments", segments.len());
-    dictionary.add_segments(&sound, &segments[..]);
+    let partitioner = { 
+        let mut partitioner = Partitioner::new(Cow::Borrowed(sound))
+            .threshold(threshold).depth(depth);
+        partitioner.train().expect("Could not train partitioner");
+        partitioner
+    };
+
+    let rows = sound.mfccs().len() / soundsym::NCOEFFS;
+    let cols = soundsym::NCOEFFS;
+    let data = Matrix::new(rows, cols, sound.mfccs().clone());
+    let predictions = partitioner.predict(&data).unwrap();
+    let splits = partitioner.partition(predictions).unwrap();
+    println!("Found {} splits", splits.len());
+    dictionary.add_segments(&sound, &splits[..]);
 }
 
 fn split_sound(bounds: (usize, usize), dictionary: &SoundDictionary) -> Option<SoundSequence> {
@@ -307,7 +328,7 @@ fn morph_sequence(seq: &SoundSequence, dictionary: &SoundDictionary, factor: f64
     seq.morph_to(&distances[..], dictionary)
 }
 
-fn cluster_sounds(sounds: &mut [Rc<Sound>], nclusters: usize) {
+fn cluster_sounds(sounds: &mut [Arc<Sound>], nclusters: usize) {
     cluster::cluster_sounds(sounds, nclusters);
 }
 
